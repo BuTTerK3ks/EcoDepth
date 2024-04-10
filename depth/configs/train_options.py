@@ -19,7 +19,7 @@ class TrainOptions(BaseOptions):
         parser = BaseOptions.initialize(self)
 
         # experiment configs
-        parser.add_argument('--epochs',      type=int,   default=25)
+        parser.add_argument('--epochs',      type=int,   default=10)
         parser.add_argument('--max_lr',          type=float, default=5e-4) # original
         parser.add_argument('--min_lr',          type=float, default=3e-5)
         parser.add_argument('--weight_decay',          type=float, default=5e-2)
@@ -29,7 +29,7 @@ class TrainOptions(BaseOptions):
 
         # logging options
         parser.add_argument('--val_freq', type=int, default=200)
-        parser.add_argument('--pro_bar', type=str2bool, default='False')
+        parser.add_argument('--pro_bar', type=str2bool, default='True')
         parser.add_argument('--model_save_freq', type=int, default=200)
         parser.add_argument('--validate_on_kitti_also', type=str2bool, default='False')
         parser.add_argument('--print_freq', type=int, default=1)

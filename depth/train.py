@@ -24,6 +24,12 @@ import glob
 from utils import colorize_depth, seed_everything, cosine_annealing, visualize_garg_crop_rectangle
 import matplotlib.pyplot as plt
 
+from torch.utils.data import DataLoader
+
+from wecreateyour.load_dataset import ThreeDCDataset
+
+
+
 os.environ['CURL_CA_BUNDLE'] = ''
 metric_name = ['d1', 'd2', 'd3', 'abs_rel', 'sq_rel', 'rmse', 'rmse_log',
                'log10', 'silog']
@@ -408,8 +414,15 @@ def main():
     seed_everything()
     opt = TrainOptions()
     args = opt.initialize().parse_args()
+
+    #TODO Self set
+    args.rank = 0
+    args.gpu = "cuda"
+    args.shift_window_test=False
+    args.pro_bar=False
+    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
     
-    utils.init_distributed_mode_simple(args)
+    #utils.init_distributed_mode_simple(args)
     device = torch.device(args.gpu)
     if args.rank == 0:
         print(f"\n Max_depth = {args.max_depth} meters for {args.dataset}!\n")
@@ -464,8 +477,39 @@ def main():
     cudnn.benchmark = True
     model.to(device)
     model_without_ddp = model
-    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=False)
+    #model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=False)
 
+
+
+    #TODO Replaced dataset loading
+
+    # Function to load IDs from a text file
+    def load_ids_from_file(file_path):
+        with open(file_path, 'r') as file:
+            ids = [line.strip() for line in file]
+        return ids
+
+    dataset_path = '/home/grannemann/Allgemein/Christian/LOOXIS/wecreateyour'
+
+    # Load training and validation IDs
+    train_ids = load_ids_from_file(os.path.join(dataset_path, 'face_detection', 'train.txt'))
+    val_ids = load_ids_from_file(os.path.join(dataset_path, 'face_detection', 'val.txt'))
+
+    resize_size = (512, 512)
+
+    # Initialize datasets with specific splits
+    train_dataset = ThreeDCDataset(data_path=dataset_path, ids=train_ids, resize_size=resize_size)
+    val_dataset = ThreeDCDataset(data_path=dataset_path, ids=val_ids, resize_size=resize_size)
+
+    # Creating PyTorch data loaders for the train and validation sets
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=4, prefetch_factor=5)
+    val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=4, prefetch_factor=5)
+
+
+
+
+
+    '''
     # Dataset setting
     dataset_kwargs = {'dataset_name': args.dataset, 'data_path': args.data_path, 'args': args}
     train_dataset = get_dataset(**dataset_kwargs)
@@ -483,7 +527,14 @@ def main():
                                                pin_memory=True, drop_last=True, shuffle=False)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, sampler=sampler_val, num_workers=args.workers,
                                              pin_memory=True)
-   
+    '''
+
+
+
+
+
+
+
     # Training settings
     criterion_d = SiLogLoss(args=args)
 
