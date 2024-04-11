@@ -27,6 +27,7 @@ import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 
 from wecreateyour.load_dataset import ThreeDCDataset
+from tqdm import tqdm
 
 
 
@@ -70,16 +71,27 @@ def log_metric(tag, scalar_value, global_step, tboard_writer, args=None):
 def train(train_loader, val_loader, model, model_without_ddp,  criterion_d, log_txt, optimizer, device, curr_epoch, args, tboard_writer):    
     global global_step
     model.train()
+
+    # Selfmade
+    args.rank = 0
+    print("Started training Epoch %d" % curr_epoch)
+
+
     if args.rank == 0:
         depth_loss = logging.AverageMeter()
     half_epoch = args.epochs // 2
     iterations_per_epoch = len(train_loader)
     result_lines = []
+    iterations = len(train_loader)
 
     grad_accum_iter = 2
     optimizer.zero_grad()
+
+    # Wrap the training loader with tqdm for a progress bar
+    train_loader_tqdm = tqdm(enumerate(train_loader), total=iterations, desc=f"Epoch {curr_epoch}/{args.epochs}")
     
-    for batch_idx, batch in enumerate(train_loader):      
+    for batch_idx, batch in train_loader_tqdm:
+    #for batch_idx, batch in enumerate(train_loader):
         global_step += 1
 
         if args.learning_rate_schedule == "one_cycle":
@@ -115,6 +127,8 @@ def train(train_loader, val_loader, model, model_without_ddp,  criterion_d, log_
 
         input_RGB = batch['image'].to(device)
         depth_gt = batch['depth'].to(device)
+        mask = batch['mask'].to(device)
+
 
         # the stable diffusion pipeline requires image size (height and width) in multiples of 64
         # hence do padding
@@ -126,22 +140,31 @@ def train(train_loader, val_loader, model, model_without_ddp,  criterion_d, log_
         new_input_RGB[:, :, :old_h, :old_w] = input_RGB
         input_RGB = new_input_RGB
 
+
         preds = model(input_RGB)
         
         pred_d = preds['pred_d']
+
 
         #undo padding
         new_pred_d = pred_d[:, :, :old_h, :old_w]
         pred_d = new_pred_d
 
+
+
+        pred_d = pred_d.squeeze(dim=1) * mask
+        depth_gt = depth_gt * mask
+
+
         
-        loss_d = criterion_d(pred_d.squeeze(dim=1), depth_gt)
+        loss_d = criterion_d(pred_d, depth_gt)
         if args.gradient_accumulation:
             loss_d = loss_d / grad_accum_iter 
 
         if args.rank == 0:
             depth_loss.update(loss_d.item(), input_RGB.size(0))
         loss_d.backward()
+
 
         if args.gradient_accumulation:
             if ((batch_idx + 1) % grad_accum_iter == 0) or (batch_idx + 1 == len(train_loader)):
@@ -155,13 +178,21 @@ def train(train_loader, val_loader, model, model_without_ddp,  criterion_d, log_
 
         results_dict = {}
 
+        train_loader_tqdm.set_postfix(
+        {'Depth Loss': f'{depth_loss.val:.4f} ({depth_loss.avg:.4f})', 'LR': f'{current_lr:.6f}'})
+
         # Log loss, metrics to wandb and training imgs, depths to Tensorboard.
         if args.rank == 0:
+
+            '''
             if args.pro_bar:
+
+                # Update the progress bar
                 logging.progress_bar(batch_idx, len(train_loader), args.epochs, curr_epoch,
                                     ('Depth Loss: %.4f (%.4f)' %
                                     (depth_loss.val, depth_loss.avg)))
-                
+            '''
+
             # Log Training logs like train_loss, lr, etc to wandb.
             if batch_idx % args.print_freq == 0:
                 result_line = 'Epoch: [{0}][{1}/{2}]\t Loss: {loss}, LR: {lr}\n'.format(
@@ -281,11 +312,13 @@ def blend_depths(left,right):
 
 def validate(val_loader, model, criterion_d, device, curr_epoch, args):
     global last_save_epoch
-    if args.rank == 0 and args.save_depths_gray and curr_epoch > last_save_epoch:
+    if args.rank == 0 and curr_epoch > last_save_epoch:
         global log_dir
         print("log_dir in validate()",log_dir)
         depth_gray_path = os.path.join(log_dir, "depth_gray")
+        depth_numpy_path = os.path.join(log_dir, "depth_numpy")
         os.makedirs(depth_gray_path, exist_ok=True)
+        os.makedirs(depth_numpy_path, exist_ok=True)
         print("Will save depth in gray (orig) in to %s" % depth_gray_path)
         
     if args.rank == 0 and args.save_depths_color and curr_epoch > last_save_epoch:
@@ -306,6 +339,7 @@ def validate(val_loader, model, criterion_d, device, curr_epoch, args):
     for batch_idx, batch in enumerate(val_loader):
         input_RGB = batch['image'].to(device)
         depth_gt = batch['depth'].to(device)
+        mask = batch['mask'].to(device)
         filename = batch['filename'][0]
 
         with torch.no_grad():
@@ -347,27 +381,37 @@ def validate(val_loader, model, criterion_d, device, curr_epoch, args):
             
         pred_d = pred_d.squeeze()
         depth_gt = depth_gt.squeeze()
+        mask = mask.squeeze()
+
+        pred_d = pred_d * mask
+        depth_gt = depth_gt * mask
 
         loss_d = criterion_d(pred_d.squeeze(), depth_gt)
         ddp_logger.update(loss_d=loss_d.item())
         if args.rank == 0:
             depth_loss.update(loss_d.item(), input_RGB.size(0))
 
-        pred_crop, gt_crop = metrics.cropping_img(args, pred_d, depth_gt)
+        pred_crop, gt_crop = metrics.cropping_img(args, pred_d, depth_gt, mask)
         computed_result = metrics.eval_depth(pred_crop, gt_crop)
 
         if args.rank == 0 and curr_epoch > last_save_epoch:
+            pred_d_numpy = pred_d.cpu().numpy()
             
             if args.save_depths_gray:
                 save_path = os.path.join(depth_gray_path, filename)
                 save_path = save_path.replace('jpg', 'png') if save_path.split('.')[-1] == 'jpg' else save_path
-                pred_d_numpy = pred_d.cpu().numpy()
+
                 if args.dataset == 'kitti':
                     pred_d_numpy = pred_d_numpy * 256.0
                     cv2.imwrite(save_path, pred_d_numpy.astype(np.uint16),[cv2.IMWRITE_PNG_COMPRESSION, 0])
-                else: #NYUv2
+                if args.dataset == 'nyudepthv2':
                     pred_d_numpy = pred_d_numpy * 1000.0
                     cv2.imwrite(save_path, pred_d_numpy.astype(np.uint16), [cv2.IMWRITE_PNG_COMPRESSION, 0])
+
+            if args.save_numpy:
+                save_path = os.path.join(depth_numpy_path, filename + '.npy')
+                np.save(save_path, pred_d_numpy)
+
                     
             if args.save_depths_color:
                 save_path = os.path.join(depth_color_path, filename)

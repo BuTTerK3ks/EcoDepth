@@ -28,20 +28,22 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--log_dir', type=str, default='./logs')
 
         # logging options
-        parser.add_argument('--val_freq', type=int, default=200)
+        parser.add_argument('--val_freq', type=int, default=10000)
         parser.add_argument('--pro_bar', type=str2bool, default='True')
-        parser.add_argument('--model_save_freq', type=int, default=200)
+        parser.add_argument('--model_save_freq', type=int, default=10000)
         parser.add_argument('--validate_on_kitti_also', type=str2bool, default='False')
-        parser.add_argument('--print_freq', type=int, default=1)
+        parser.add_argument('--print_freq', type=int, default=500)
         parser.add_argument('--save_last_model',help="save last model also to resume training if crashed,stopped,etc", 
                             action='store_true')     
         parser.add_argument('--resume_from', help='the checkpoint file to resume from', default=None)
         parser.add_argument('--save_depths_gray', action='store_true')
-        parser.add_argument('--save_depths_color', action='store_true') 
+        parser.add_argument('--save_depths_color', action='store_true')
+        parser.add_argument('--save_numpy', action='store_true',
+                            help='save result as numpy array')
         parser.add_argument('--learning_rate_schedule', type=str)
         parser.add_argument('--gradient_accumulation', type=str2bool, default='False')
         parser.add_argument('--log_in_wandb', type=str2bool, default='False')
-        parser.add_argument('--log_images_freq', type=int, default=50, help='batch frequency of logging images,depths during training to tensorboard')
+        parser.add_argument('--log_images_freq', type=int, default=500, help='batch frequency of logging images,depths during training to tensorboard')
         parser.add_argument('--finetune_on_another_dataset', type=str2bool, default='False')
         parser.add_argument('--pretrained_ckpt_path', type=str, default='')  
         

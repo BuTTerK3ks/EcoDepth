@@ -25,6 +25,8 @@ class TestOptions(BaseOptions):
 
         parser.add_argument('--save_eval_pngs', action='store_true',
                             help='save result image into evaluation form')
+        parser.add_argument('--save_numpy', action='store_true',
+                            help='save result as numpy array')
         parser.add_argument('--save_visualize', action='store_true',
                             help='save result image into visulized form')
         parser.add_argument('--median_scaling', type=str2bool, default='False') 

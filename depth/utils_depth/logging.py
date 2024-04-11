@@ -12,58 +12,46 @@ import numpy as np
 import torch
 
 
-TOTAL_BAR_LENGTH = 30.
+TOTAL_BAR_LENGTH = 80
 last_time = time.time()
 begin_time = last_time
 
 
+def format_time(seconds):
+    # Helper function to format time as h:mm:ss
+    m, s = divmod(int(seconds), 60)
+    h, m = divmod(m, 60)
+    return f'{h:d}:{m:02d}:{s:02d}'
+
+
 def progress_bar(current, total, epochs, cur_epoch, msg=None):
-    _, term_width = os.popen('stty size', 'r').read().split()
-    term_width = int(term_width)
     global last_time, begin_time
+
     if current == 0:
-        begin_time = time.time()  # Reset for new bar.
+        begin_time = time.time()  # Reset for new bar
 
-    cur_len = int(TOTAL_BAR_LENGTH * current / total)
-    rest_len = int(TOTAL_BAR_LENGTH - cur_len) - 1
+    # Calculate the length of the current progress and the remaining length
+    cur_len = int(TOTAL_BAR_LENGTH * current / total)  # Ensure cur_len is an integer
+    rest_len = TOTAL_BAR_LENGTH - cur_len  # rest_len is already an integer by subtraction
 
-    sys.stdout.write(' [')
-    for i in range(cur_len):
-        sys.stdout.write('=')
-    sys.stdout.write('>')
-    for i in range(rest_len):
-        sys.stdout.write('.')
-    sys.stdout.write(']')
+    # Build the progress bar string
+    bar = '[' + '=' * cur_len + '>' + '.' * rest_len + ']'
 
     cur_time = time.time()
     step_time = cur_time - last_time
     last_time = cur_time
     tot_time = cur_time - begin_time
-    remain_time = step_time * (total - current) + \
-        (epochs - cur_epoch) * step_time * total
+    remain_time = step_time * (total - current) + (epochs - cur_epoch) * step_time * total
 
-    L = []
-    L.append('  Step: %s' % format_time(step_time))
-    L.append(' | Tot: %s' % format_time(tot_time))
-    L.append(' | Rem: %s' % format_time(remain_time))
+    L = [bar]
+    L.append(f' Step: {format_time(step_time)}')
+    L.append(f' | Tot: {format_time(tot_time)}')
+    L.append(f' | Rem: {format_time(remain_time)}')
     if msg:
-        L.append(' | ' + msg)
+        L.append(f' | {msg}')
 
     msg = ''.join(L)
-    sys.stdout.write(msg)
-    for i in range(157 - int(TOTAL_BAR_LENGTH) - len(msg) - 3):
-        sys.stdout.write(' ')
-
-    # Go back to the center of the bar.
-    for i in range(157 - int(TOTAL_BAR_LENGTH / 2) + 2):
-        sys.stdout.write('\b')
-    sys.stdout.write(' %d/%d ' % (current + 1, total))
-
-    if current < total - 1:
-        sys.stdout.write('\r')
-    else:
-        sys.stdout.write('\n')
-    sys.stdout.flush()
+    print(f'\r{msg} {current + 1}/{total}', end='\n' if current == total - 1 else '')
 
 
 class AverageMeter():
