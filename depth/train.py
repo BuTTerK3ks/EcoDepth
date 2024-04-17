@@ -539,7 +539,7 @@ def main():
     train_ids = load_ids_from_file(os.path.join(dataset_path, 'face_detection', 'train.txt'))
     val_ids = load_ids_from_file(os.path.join(dataset_path, 'face_detection', 'val.txt'))
 
-    resize_size = (512, 512)
+    resize_size = (64, 64)
 
     # Initialize datasets with specific splits
     train_dataset = ThreeDCDataset(data_path=dataset_path, ids=train_ids, resize_size=resize_size)

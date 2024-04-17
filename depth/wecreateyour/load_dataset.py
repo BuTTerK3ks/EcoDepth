@@ -36,10 +36,6 @@ class ThreeDCDataset(Dataset):
         mask_path = os.path.join(self.data_path, 'mask_numpy', base_filename + '.npy')
         depth_path = os.path.join(self.data_path, 'depth_numpy', base_filename + '.npy')
 
-        # Load image, mask, and depth
-        image = np.load(image_path)
-        mask = np.load(mask_path)
-        depth = np.load(depth_path)
 
         # Load image, mask, and depth
         image = np.load(image_path)
@@ -76,6 +72,7 @@ class ThreeDCDataset(Dataset):
         image_tensor = torch.from_numpy(image).float() / 255.0  # Normalize image
         mask_tensor = torch.from_numpy(mask).long()  # Masks are typically long type
         depth_tensor = torch.from_numpy(depth).float()
+
 
         # Permute tensors to match PyTorch's NCHW format
         image_tensor = image_tensor.permute(2, 0, 1)

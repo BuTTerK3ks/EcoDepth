@@ -28,9 +28,9 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--log_dir', type=str, default='./logs')
 
         # logging options
-        parser.add_argument('--val_freq', type=int, default=10000)
+        parser.add_argument('--val_freq', type=int, default=1000)
         parser.add_argument('--pro_bar', type=str2bool, default='True')
-        parser.add_argument('--model_save_freq', type=int, default=10000)
+        parser.add_argument('--model_save_freq', type=int, default=1000)
         parser.add_argument('--validate_on_kitti_also', type=str2bool, default='False')
         parser.add_argument('--print_freq', type=int, default=500)
         parser.add_argument('--save_last_model',help="save last model also to resume training if crashed,stopped,etc", 

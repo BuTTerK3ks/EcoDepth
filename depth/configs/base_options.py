@@ -25,7 +25,7 @@ class BaseOptions():
         parser.add_argument('--data_path',    type=str, default='/data/ssd1/')
         parser.add_argument('--dataset',      type=str, default='nyudepthv2',
                             choices=['nyudepthv2', 'kitti', 'wecreateyour'])
-        parser.add_argument('--batch_size',   type=int, default=2)
+        parser.add_argument('--batch_size',   type=int, default=5)
         parser.add_argument('--workers',      type=int, default=4)
         
         # depth configs
